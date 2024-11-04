@@ -1,4 +1,5 @@
 ﻿using HTTPServer.Extensions;
+
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
@@ -7,10 +8,14 @@ namespace HTTPServer.Services.Models;
 
 public class HttpRequest
 {
-    public required TcpClient Client { get; set; }
+    public TcpClient? Client { get; set; }
 
     public bool IsSslEnabled { get; set; }
     public SslStream? SslStream { get; set; }
+
+    public required HttpMethod Method { get; set; }
+    public required string Path { get; set; }
+    public required string ProtocolVersion { get; set; }
 
     public required Dictionary<string, string> Headers { get; set; }
 
@@ -57,6 +62,11 @@ public class HttpRequest
         }
         else
         {
+            if (Client is null)
+            {
+                throw new Exception("Client was null during response.");
+            }
+
             await Client.GetStream().WriteAsync(data);
         }
     }

@@ -38,11 +38,11 @@ public class HTTPServer : BackgroundService
         while (!cancellationToken.IsCancellationRequested)
         {
             var client = await _httpListener.AcceptTcpClientAsync();
-            _ = HandleHttpConnectionAsync(new HttpRequest()
-            { 
-                Client = client,
-                Headers = await client.GetStream().ReadHttpHeadersAsync()
-            });
+
+            var request = await client.GetStream().ReadHttpRequest();
+            request.Client = client;
+
+            _ = HandleHttpConnectionAsync(request);
         }
     }
 
@@ -50,14 +50,14 @@ public class HTTPServer : BackgroundService
     {
         try
         {
-            logger.LogInformation($"Client '{request.Client.Client.RemoteEndPoint}' connected to HTTP server, redirecting to HTTPS..");
+            logger.LogInformation($"Client '{request.Client?.Client.RemoteEndPoint}' connected to HTTP server, redirecting to HTTPS..");
 
             await request.RespondAsync(new HttpResponse(HttpStatus.MovedPermanently)
             {
                 Content = "The HTTP version of this site is disabled, redirecting to HTTPS secured website.",
                 Headers = new Dictionary<string, string>()
                 {
-                    { "Location", "https://localhost/" }
+                    { "Location", $"https://localhost{request.Path}" }
                 }
             });
         }

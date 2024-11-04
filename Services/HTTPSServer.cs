@@ -4,11 +4,12 @@ using Microsoft.Extensions.Logging;
 using System.Net.Sockets;
 using System.Net;
 using System.Net.Security;
-using System.Text;
 using System.Security.Cryptography.X509Certificates;
 
 using HTTPServer.Services.Models;
 using HTTPServer.Extensions;
+using HTTPServer.Configuration;
+using System.Text;
 
 namespace HTTPServer.Services;
 
@@ -17,12 +18,17 @@ internal class HTTPSServer : BackgroundService
     private TcpListener _httpsListener;
 
     private readonly ILogger<HTTPSServer> logger;
+    private readonly HTTPServerConfig config;
+    private readonly FetchContentService fetchService;
 
-    public HTTPSServer(ILogger<HTTPSServer> logger)
+    public HTTPSServer(ILogger<HTTPSServer> logger, HTTPServerConfig config,
+        FetchContentService fetchService)
     {
         _httpsListener = new TcpListener(IPAddress.Any, 443);
 
         this.logger = logger;
+        this.config = config;
+        this.fetchService = fetchService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,41 +80,30 @@ internal class HTTPSServer : BackgroundService
 
     private async Task<HttpRequest> ReadHttpRequestAsync(TcpClient client, SslStream sslStream)
     {
-        return new HttpRequest()
-        { 
-            Client = client,
-            IsSslEnabled = true,
-            SslStream = sslStream,
-            Headers = await sslStream.ReadHttpHeadersAsync()
-        };
+        var request = await sslStream.ReadHttpRequest();
+        request.Client = client;
+        request.IsSslEnabled = true;
+        request.SslStream = sslStream;
+
+        return request;
     }
 
     private async Task HandleHttpRequestAsync(HttpRequest request)
     {
         logger.LogInformation($"Received request: {Environment.NewLine}{request.ToString()}");
 
-        string markup = """
-            <!DOCTYPE html5>
-            <html>
-            <head>
-            <title>HTTPServer</title>
-            </head>
-            <body>
-            <h1>Hello, World!</h1>
-            </body>
-            </html>
-            """;
+        byte[] data = await fetchService.GetContentAsync(request.Path);
 
         logger.LogInformation("Sending response..");
 
         await request.RespondAsync(new HttpResponse(HttpStatus.OK)
         {
-            Content = markup,
+            Content = Encoding.UTF8.GetString(data),
             Headers = new Dictionary<string, string>()
             {
                 { "Content-Type", "text/html; charset=UTF-8" },
                 { "Date", $"{DateTime.Now.ToString("DDD, dd MMM yyyy hh:mm:ss GMT")}" },
-                { "Content-Length", $"{markup.Length}" }
+                { "Content-Length", $"{data.Length}" }
             }
         });
     }
