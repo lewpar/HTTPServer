@@ -1,9 +1,11 @@
+using HTTPServer.Extensions;
+using HTTPServer.Services.Models;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 
 namespace HTTPServer.Services;
 
@@ -36,20 +38,32 @@ public class HTTPServer : BackgroundService
         while (!cancellationToken.IsCancellationRequested)
         {
             var client = await _httpListener.AcceptTcpClientAsync();
-            _ = HandleHttpConnectionAsync(client);
+            _ = HandleHttpConnectionAsync(new HttpRequest()
+            { 
+                Client = client,
+                Headers = await client.GetStream().ReadHttpHeadersAsync()
+            });
         }
     }
 
-    private async Task HandleHttpConnectionAsync(TcpClient client)
+    private async Task HandleHttpConnectionAsync(HttpRequest request)
     {
-        logger.LogInformation($"Client '{client.Client.RemoteEndPoint}' connected to HTTP server, redirecting to HTTPS..");
+        try
+        {
+            logger.LogInformation($"Client '{request.Client.Client.RemoteEndPoint}' connected to HTTP server, redirecting to HTTPS..");
 
-        var redirectResponse = 
-            "HTTP/1.1 301 Moved Permanently\r\n" +
-            "Location: https://localhost/\r\n" +
-            "\r\n";
-
-        byte[] response = Encoding.UTF8.GetBytes(redirectResponse);
-        await client.GetStream().WriteAsync(response);
+            await request.RespondAsync(new HttpResponse(HttpStatus.MovedPermanently)
+            {
+                Content = "The HTTP version of this site is disabled, redirecting to HTTPS secured website.",
+                Headers = new Dictionary<string, string>()
+                {
+                    { "Location", "https://localhost/" }
+                }
+            });
+        }
+        catch(Exception ex)
+        {
+            logger.LogCritical($"{ex.Message} {ex.StackTrace}");
+        }
     }
 }

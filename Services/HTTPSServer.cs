@@ -7,6 +7,9 @@ using System.Net.Security;
 using System.Text;
 using System.Security.Cryptography.X509Certificates;
 
+using HTTPServer.Services.Models;
+using HTTPServer.Extensions;
+
 namespace HTTPServer.Services;
 
 internal class HTTPSServer : BackgroundService
@@ -60,7 +63,8 @@ internal class HTTPSServer : BackgroundService
 
             await sslStream.AuthenticateAsServerAsync(serverCertificate);
 
-            await HandleHttpRequestAsync(sslStream);
+            var request = await ReadHttpRequestAsync(client, sslStream);
+            await HandleHttpRequestAsync(request);
         }
         catch (Exception ex)
         {
@@ -68,10 +72,20 @@ internal class HTTPSServer : BackgroundService
         }
     }
 
-    private async Task HandleHttpRequestAsync(SslStream sslStream)
+    private async Task<HttpRequest> ReadHttpRequestAsync(TcpClient client, SslStream sslStream)
     {
-        var request = await ReadHttpHeadersAsync(sslStream);
-        logger.LogInformation($"Received request: {Environment.NewLine}{request}");
+        return new HttpRequest()
+        { 
+            Client = client,
+            IsSslEnabled = true,
+            SslStream = sslStream,
+            Headers = await sslStream.ReadHttpHeadersAsync()
+        };
+    }
+
+    private async Task HandleHttpRequestAsync(HttpRequest request)
+    {
+        logger.LogInformation($"Received request: {Environment.NewLine}{request.ToString()}");
 
         string markup = """
             <!DOCTYPE html5>
@@ -85,37 +99,18 @@ internal class HTTPSServer : BackgroundService
             </html>
             """;
 
-        string okResponse =
-            "HTTP/1.1 200 OK\r\n" +
-            "Content-Type: text/html; charset=UTF-8\r\n" +
-            $"Date: {DateTime.Now.ToString("DDD, dd MMM yyyy hh:mm:ss GMT")}\r\n" +
-            $"Content-Length: {markup.Length}\r\n" +
-            "\r\n" +
-            $"{markup}";
+        logger.LogInformation("Sending response..");
 
-        byte[] response = Encoding.UTF8.GetBytes(okResponse);
-        await sslStream.WriteAsync(response);
-    }
-
-    private async Task<string> ReadHttpHeadersAsync(SslStream sslStream)
-    {
-        using var reader = new StreamReader(sslStream, Encoding.UTF8, leaveOpen: true);
-        var sb = new StringBuilder();
-
-        string? line;
-
-        while ((line = await reader.ReadLineAsync()) is not null)
+        await request.RespondAsync(new HttpResponse(HttpStatus.OK)
         {
-            sb.AppendLine(line);
-
-            // Check for the end of HTTP headers (empty line indicates the end)
-            if (string.IsNullOrWhiteSpace(line))
+            Content = markup,
+            Headers = new Dictionary<string, string>()
             {
-                break;
+                { "Content-Type", "text/html; charset=UTF-8" },
+                { "Date", $"{DateTime.Now.ToString("DDD, dd MMM yyyy hh:mm:ss GMT")}" },
+                { "Content-Length", $"{markup.Length}" }
             }
-        }
-
-        return sb.ToString().Trim();
+        });
     }
 
     private X509Certificate2? GetServerCertificate()
