@@ -44,19 +44,34 @@ internal class HTTPSServer : BackgroundService
 
     private async Task HandleHttpsConnectionAsync(TcpClient client)
     {
-        logger.LogInformation($"Client '{client.Client.RemoteEndPoint}' connected.");
-
-        var stream = client.GetStream();
-        var sslStream = new SslStream(stream, true);
-
-        var serverCertificate = GetServerCertificate();
-        if (serverCertificate is null)
+        try
         {
-            logger.LogError("Failed to get server certificate.");
-            return;
-        }
+            logger.LogInformation($"Client '{client.Client.RemoteEndPoint}' connected.");
 
-        await sslStream.AuthenticateAsServerAsync(serverCertificate);
+            var stream = client.GetStream();
+            var sslStream = new SslStream(stream, true);
+
+            var serverCertificate = GetServerCertificate();
+            if (serverCertificate is null)
+            {
+                logger.LogError("Failed to get server certificate.");
+                return;
+            }
+
+            await sslStream.AuthenticateAsServerAsync(serverCertificate);
+
+            await HandleHttpRequestAsync(sslStream);
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical($"{ex.Message}: {ex.StackTrace}");
+        }
+    }
+
+    private async Task HandleHttpRequestAsync(SslStream sslStream)
+    {
+        var request = await ReadHttpHeadersAsync(sslStream);
+        logger.LogInformation($"Received request: {Environment.NewLine}{request}");
 
         string markup = """
             <!DOCTYPE html5>
@@ -80,6 +95,27 @@ internal class HTTPSServer : BackgroundService
 
         byte[] response = Encoding.UTF8.GetBytes(okResponse);
         await sslStream.WriteAsync(response);
+    }
+
+    private async Task<string> ReadHttpHeadersAsync(SslStream sslStream)
+    {
+        using var reader = new StreamReader(sslStream, Encoding.UTF8, leaveOpen: true);
+        var sb = new StringBuilder();
+
+        string? line;
+
+        while ((line = await reader.ReadLineAsync()) is not null)
+        {
+            sb.AppendLine(line);
+
+            // Check for the end of HTTP headers (empty line indicates the end)
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                break;
+            }
+        }
+
+        return sb.ToString().Trim();
     }
 
     private X509Certificate2? GetServerCertificate()
