@@ -14,7 +14,7 @@ class Program
         app.Services.AddHostedService<Services.HTTPServer>();
         app.Services.AddHostedService<Services.HTTPSServer>();
 
-        app.Services.AddScoped<Services.FetchContentService>();
+        app.Services.AddScoped<Services.IFetchContent, Services.FileSystemFetchContent>();
 
         var config = app.Configuration.GetSection("HTTPServer").Get<HTTPServerConfig>();
         if(config is null)

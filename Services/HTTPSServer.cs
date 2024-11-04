@@ -19,10 +19,10 @@ internal class HTTPSServer : BackgroundService
 
     private readonly ILogger<HTTPSServer> logger;
     private readonly HTTPServerConfig config;
-    private readonly FetchContentService fetchService;
+    private readonly IFetchContent fetchService;
 
     public HTTPSServer(ILogger<HTTPSServer> logger, HTTPServerConfig config,
-        FetchContentService fetchService)
+        IFetchContent fetchService)
     {
         _httpsListener = new TcpListener(IPAddress.Any, 443);
 
