@@ -110,12 +110,11 @@ internal class HTTPSServer : BackgroundService
 
     private X509Certificate2? GetServerCertificate()
     {
-        var thumbprint = "fb3a3eeed998c4bd7620859b738bc67bf514dd9b";
         var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
 
         store.Open(OpenFlags.ReadOnly);
 
-        var cert = store.Certificates.FirstOrDefault(c => c.Thumbprint.ToLower() == thumbprint);
+        var cert = store.Certificates.FirstOrDefault(c => c.Thumbprint.ToLower() == config.CertificateThumbprint);
 
         return cert;
     }
