@@ -52,17 +52,32 @@ public class HTTPServer : BackgroundService
         {
             logger.LogInformation($"Client '{request.Client?.Client.RemoteEndPoint}' connected to HTTP server, redirecting to HTTPS..");
 
-            await request.RespondAsync(new HttpResponse(HttpStatus.MovedPermanently)
+            var host = request.Headers.FirstOrDefault(h => h.Key.ToLower() == "host");
+            if(string.IsNullOrWhiteSpace(host.Key))
+            {
+                logger.LogCritical($"No host header was found for HTTP request: {request.ToString()}");
+                return;
+            }
+
+            var redirectResponse = new HttpResponse(HttpStatus.MovedPermanently)
             {
                 Headers = new Dictionary<string, string>()
                 {
-                    { "Location", $"https://localhost{request.RequestPath}" }
+                    { "Location", $"https://{host.Value}{request.RequestPath}" }
                 }
-            });
+            };
+
+            logger.LogInformation($"Sending redirect response: {Environment.NewLine} {redirectResponse.ToString()}");
+
+            await request.RespondAsync(redirectResponse);
         }
         catch(Exception ex)
         {
             logger.LogCritical($"{ex.Message} {ex.StackTrace}");
+        }
+        finally
+        {
+            request.Client?.Close();
         }
     }
 }

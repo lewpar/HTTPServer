@@ -69,7 +69,7 @@ public static class StreamExtensions
                 continue;
             }
 
-            headers.Add(parts[0], parts[1]);
+            headers.Add(parts[0].Trim(), parts[1].Trim());
         }
 
         return headers;
