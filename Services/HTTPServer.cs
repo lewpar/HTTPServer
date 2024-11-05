@@ -54,7 +54,6 @@ public class HTTPServer : BackgroundService
 
             await request.RespondAsync(new HttpResponse(HttpStatus.MovedPermanently)
             {
-                Content = "The HTTP version of this site is disabled, redirecting to HTTPS secured website.",
                 Headers = new Dictionary<string, string>()
                 {
                     { "Location", $"https://localhost{request.RequestPath}" }
