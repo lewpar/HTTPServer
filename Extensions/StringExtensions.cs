@@ -12,4 +12,17 @@ public static class StringExtensions
 
         return null;
     }
+
+    public static string GetHttpRequestFileName(this string path)
+    {
+        string result = path;
+        result = result.Trim();
+
+        if(path == "/")
+        {
+            result = "/index.html";
+        }
+
+        return result;
+    }
 }

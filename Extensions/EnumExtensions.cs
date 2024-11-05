@@ -4,7 +4,7 @@ namespace HTTPServer.Extensions;
 
 public static class EnumExtensions
 {
-    public static string GetFriendlyName(this HttpStatus status)
+    public static string GetHttpProtocolName(this HttpStatus status)
     {
         switch(status)
         {
@@ -13,6 +13,12 @@ public static class EnumExtensions
 
             case HttpStatus.MovedPermanently:
                 return "Moved Permanently";
+
+            case HttpStatus.FileNotFound:
+                return "Not Found";
+
+            case HttpStatus.InternalError:
+                return "Internal Server Error";
         }
 
         throw new NotImplementedException($"Missing friendly name for {status} HttpStatus.");

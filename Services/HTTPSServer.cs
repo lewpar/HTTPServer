@@ -71,6 +71,8 @@ internal class HTTPSServer : BackgroundService
 
             var request = await ReadHttpRequestAsync(client, sslStream);
             await HandleHttpRequestAsync(request);
+
+            client.Close();
         }
         catch (Exception ex)
         {
@@ -92,20 +94,63 @@ internal class HTTPSServer : BackgroundService
     {
         logger.LogInformation($"Received request: {Environment.NewLine}{request.ToString()}");
 
-        byte[] data = await fetchService.GetContentAsync(request.Path);
+        byte[]? data;
+        try
+        {
+            data = await fetchService.GetContentAsync(request.RequestPath);
+        }
+        catch(Exception ex)
+        {
+            var content = "File not found.";
+            var fileNotFoundResponse = new HttpResponse(HttpStatus.FileNotFound)
+            {
+                Content = content,
+                Headers = new Dictionary<string, string>()
+                {
+                    { "Content-Type", "text/html; charset=UTF-8" },
+                    { "Content-Length", content.Length.ToString() }
+                }
+            };
 
-        logger.LogInformation("Sending response..");
+            await request.RespondAsync(fileNotFoundResponse);
 
-        await request.RespondAsync(new HttpResponse(HttpStatus.OK)
+            logger.LogCritical($"{ex.Message} {ex.StackTrace}");
+            return;
+        }
+
+        if(data is null)
+        {
+            var content = "An internal error occured.";
+            var internalErrorResponse = new HttpResponse(HttpStatus.InternalError)
+            {
+                Content = content,
+                Headers = new Dictionary<string, string>()
+                {
+                    { "Content-Type", "text/html; charset=UTF-8" },
+                    { "Content-Length", content.Length.ToString() }
+                }
+            };
+
+            await request.RespondAsync(internalErrorResponse);
+
+            logger.LogCritical($"An internal error occured for request: {request.ToString()}");
+            return;
+        }
+
+        var response = new HttpResponse(HttpStatus.OK)
         {
             Content = Encoding.UTF8.GetString(data),
             Headers = new Dictionary<string, string>()
             {
-                { "Content-Type", "text/html; charset=UTF-8" },
-                { "Date", $"{DateTime.Now.ToString("DDD, dd MMM yyyy hh:mm:ss GMT")}" },
+                { "Content-Type", request.GetMIMEType(request.RequestPath.GetHttpRequestFileName()) },
+                { "Date", $"{DateTime.Now.ToString("ddd dd MMM yyyy hh:mm:ss GMT")}" },
                 { "Content-Length", $"{data.Length}" }
             }
-        });
+        };
+
+        logger.LogInformation($"Sent response: {Environment.NewLine}{response.ToString()}");
+
+        await request.RespondAsync(response);
     }
 
     private X509Certificate2? GetServerCertificate()

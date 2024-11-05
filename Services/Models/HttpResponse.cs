@@ -1,4 +1,6 @@
-﻿namespace HTTPServer.Services.Models;
+﻿using System.Text;
+
+namespace HTTPServer.Services.Models;
 
 public class HttpResponse
 {
@@ -10,5 +12,19 @@ public class HttpResponse
     {
         StatusCode = statusCode;
         Headers = new Dictionary<string, string>();
+    }
+
+    public override string ToString()
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine($"HTTP/1.1 {(int)StatusCode} {StatusCode}");
+
+        foreach (var header in Headers)
+        {
+            sb.AppendLine($"{header.Key}: {header.Value}");
+        }
+
+        return sb.ToString();
     }
 }

@@ -40,7 +40,7 @@ public static class StreamExtensions
         var request = new HttpRequest()
         {
             Method = method.Value,
-            Path = path,
+            RequestPath = path,
             ProtocolVersion = $"{protocol}/{protocolVersion}",
             Headers = headers
         };
